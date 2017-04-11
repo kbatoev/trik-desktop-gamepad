@@ -24,6 +24,7 @@
 # QMAKE_CXXFLAGS += -isystem "$(QTDIR)/include/QtMultimediaWidgets"
 
 QT += core gui network widgets multimedia multimediawidgets
+QT += multimedia-private
 
 CONFIG += c++11
 

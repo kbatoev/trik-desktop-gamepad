@@ -34,6 +34,13 @@ GamepadForm::GamepadForm()
 	this->installEventFilter(this);
 	setUpGamepadForm();
 	startThread();
+
+	QVideoProbe *probe = new QVideoProbe;
+	connect(probe, SIGNAL(videoFrameProbed(QVideoFrame)), this, SLOT(mySlot(QVideoFrame)));
+	bool result = probe->setSource(player);
+	isFrameNecessary = 0;
+	qDebug() << result;
+	clipboard = QApplication::clipboard();
 }
 
 GamepadForm::~GamepadForm()
@@ -203,6 +210,94 @@ void GamepadForm::setFontToPadButtons()
 	mUi->buttonPad2Up->setFont(font);
 	mUi->buttonPad2Left->setFont(font);
 	mUi->buttonPad2Right->setFont(font);
+}
+
+int *convertBits(QVideoFrame frame) {
+	int height = frame.height();
+	int width = frame.width();
+	int size = height * width * 3;
+	uchar *resultBits = new int[size];
+	uchar *bits = frame.bits();
+	for (int i = 2; i < size; i += 2) {
+		int y = static_cast<int> (bits[i - 2]);
+		int u = static_cast<int> (bits[i - 1]);
+		int v = static_cast<int> (bits[i]);
+
+		int r = y + int(1.13983 * (v - 128));
+		int g = y - int(0.39465 * (u - 128)) - int(0.58060 * (v - 128));
+		int b = y + int(2.03211 * (u - 128));
+		resultBits[i - 2] = r;
+		resultBits[i - 1] = g;
+		resultBits[i] = b;
+	}
+	return resultBits;
+}
+
+void GamepadForm::mySlot(QVideoFrame buffer)
+{
+	if (isFrameNecessary < 5) {
+
+
+		QImage img;
+		QVideoFrame frame(buffer);  // make a copy we can call map (non-const) on
+		frame.map(QAbstractVideoBuffer::ReadOnly);
+		qDebug() << "pixel format: " << frame.pixelFormat();
+		qDebug() << "size: " << frame.size();
+		qDebug() << "readable " << frame.isReadable();
+		qDebug() << "writeable " << frame.isWritable();
+		int *bitsForRgb = convertBits(frame);
+		//auto bits = frame.bits();
+		//QImage img1(bitsForRgb, frame.width(), frame.height(), frame.bytesPerLine(), QImage::Format_RGB32);
+		//clipboard->setImage(img1);
+		QString res = "";
+		//for (int i = 0; i < frame.width() * frame.height() + 10; i++)
+		//	res += bits[i];
+		qDebug() << res;
+		QImage::Format imageFormat = QVideoFrame::imageFormatFromPixelFormat(
+					frame.pixelFormat());
+		qDebug() << frame.mappedBytes();
+		qDebug() << frame.bytesPerLine();
+		// BUT the frame.pixelFormat() is QVideoFrame::Format_Jpeg, and this is
+		// mapped to QImage::Format_Invalid by
+		// QVideoFrame::imageFormatFromPixelFormat
+		if (imageFormat != QImage::Format_Invalid) {
+			img = QImage(frame.bits(),
+						 frame.width(),
+						 frame.height(),
+						 // frame.bytesPerLine(),
+						 imageFormat);
+		} else {
+			// e.g. JPEG
+			int nbytes = frame.mappedBytes();
+			img = QImage::fromData(frame.bits(), nbytes);
+		}
+		frame.unmap();
+
+		isFrameNecessary++;
+		/*
+		qDebug() << "validness: " << frame.isValid();
+		qDebug() << "frame geometry: " << frame.size();
+		qDebug() << "readable: " << frame.isReadable();
+		qDebug() << "writeable: " << frame.isWritable();
+		QImage::Format imageFormat =
+				QVideoFrame::imageFormatFromPixelFormat(frame.pixelFormat());
+
+		qDebug() << imageFormat;
+		QImage img(frame.bits(),
+				   frame.width(),
+				   frame.height(),
+				   frame.bytesPerLine(),
+				   imageFormat);
+		//mUi->connectedLabel->setPixmap(QPixmap::fromImage(img));
+		QLabel *label = new QLabel;
+		label->setMinimumWidth(480);
+		label->setMinimumHeight(640);
+		qDebug() << img.save("myImg.png");
+		label->setPixmap(QPixmap::fromImage(img));
+		label->show();
+		*/
+
+	}
 }
 
 void GamepadForm::setButtonChecked(const int &key, bool checkStatus)

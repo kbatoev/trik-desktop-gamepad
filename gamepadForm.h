@@ -19,6 +19,8 @@
 
 #include <QMediaPlayer>
 #include <QVideoWidget>
+#include <QVideoProbe>
+#include <QClipboard>
 
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QMenuBar>
@@ -111,6 +113,8 @@ private slots:
 
 	void setFontToPadButtons();
 
+	void mySlot(QVideoFrame);
+
 signals:
 	void commandReceived(QString);
 	void programFinished();
@@ -177,4 +181,8 @@ private:
 	QMediaPlayer *player;
 	QVideoWidget *videoWidget;
 	QMovie movie;
+	QClipboard *clipboard;
+
+
+	int isFrameNecessary = 0;
 };
