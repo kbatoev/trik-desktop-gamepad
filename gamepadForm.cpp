@@ -211,13 +211,71 @@ void GamepadForm::setFontToPadButtons()
 	mUi->buttonPad2Left->setFont(font);
 	mUi->buttonPad2Right->setFont(font);
 }
+QImage GamepadForm::convertBits(const QVideoFrame &frame) {
 
-int *convertBits(QVideoFrame frame) {
-	int height = frame.height();
+	//int resultBits[size];
+	qDebug() << frame.mappedBytes();
+	qDebug() << frame.size();
+	qDebug() << "planes count: " << frame.planeCount();
+	qDebug() << "bytes of 0 plane: " << frame.bytesPerLine(0);
+	qDebug() << "bytes of 1 plane: " << frame.bytesPerLine(1);
+	qDebug() << "bytes of 2 plane: " << frame.bytesPerLine(2);
+	qDebug() << "bytes of 3 plane: " << frame.bytesPerLine(3);
+
+	/*
+	size.total = size.width * size.height;
+	y = yuv[position.y * size.width + position.x];
+	u = yuv[(position.y / 2) * (size.width / 2) + (position.x / 2) + size.total];
+	v = yuv[(position.y / 2) * (size.width / 2) + (position.x / 2) + size.total + (size.total / 4)];
+	*/
 	int width = frame.width();
-	int size = height * width * 3;
-	uchar *resultBits = new int[size];
-	uchar *bits = frame.bits();
+	int height = frame.height();
+	int size = height * width;
+	const uchar *data = frame.bits();
+	QImage img(width, height, QImage::Format_RGB32);
+	//img.fill(QColor(Qt::white).rgb());
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++) {
+			int y = static_cast<int> (data[i * width + j]);
+			int u = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size]);
+			int v = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size + (size / 4)]);
+
+			//float R = Y + 1.402 * (V - 128);
+			//float G = Y - 0.344 * (U - 128) - 0.714 * (V - 128);
+			//float B = Y + 1.772 * (U - 128);
+
+			int r = y + int(1.13983 * (v - 128));
+			int g = y - int(0.39465 * (u - 128)) - int(0.58060 * (v - 128));
+			int b = y + int(2.03211 * (u - 128));
+			//int r = y + int(1.402 * (v - 128));
+			//int g = y - int(0.714 * (v - 128)) - int(0.344 * (u - 128));
+			//int b = y + int(1.772 * (u - 128));
+			if (r < 0)
+				r = 0;
+			if (g < 0)
+				g = 0;
+			if (b < 0)
+				b = 0;
+			if (r > 255)
+				r = 255;
+			if (g > 255)
+				g = 255;
+			if (b > 255)
+				b = 255;
+			//r = r < 0 ? 0 : r > 255 ? 255 : r;
+			//g = g < 0 ? 0 : g > 255 ? 255 : g;
+			//r = b < 0 ? 0 : b > 255 ? 255 : b;
+
+			img.setPixel(j, i, qRgb(r, g, b));
+		}
+
+	clipboard->setImage(img);
+	if (img.save("img.png")) {
+		int f = 1;
+	}
+
+
+	/*
 	for (int i = 2; i < size; i += 2) {
 		int y = static_cast<int> (bits[i - 2]);
 		int u = static_cast<int> (bits[i - 1]);
@@ -230,13 +288,14 @@ int *convertBits(QVideoFrame frame) {
 		resultBits[i - 1] = g;
 		resultBits[i] = b;
 	}
-	return resultBits;
+	*/
+	return img;
 }
+
 
 void GamepadForm::mySlot(QVideoFrame buffer)
 {
 	if (isFrameNecessary < 5) {
-
 
 		QImage img;
 		QVideoFrame frame(buffer);  // make a copy we can call map (non-const) on
@@ -245,7 +304,8 @@ void GamepadForm::mySlot(QVideoFrame buffer)
 		qDebug() << "size: " << frame.size();
 		qDebug() << "readable " << frame.isReadable();
 		qDebug() << "writeable " << frame.isWritable();
-		int *bitsForRgb = convertBits(frame);
+		QImage img1 = convertBits(frame);
+		clipboard->setImage(img1);
 		//auto bits = frame.bits();
 		//QImage img1(bitsForRgb, frame.width(), frame.height(), frame.bytesPerLine(), QImage::Format_RGB32);
 		//clipboard->setImage(img1);
