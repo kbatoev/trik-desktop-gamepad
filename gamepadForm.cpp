@@ -35,12 +35,6 @@ GamepadForm::GamepadForm()
 	setUpGamepadForm();
 	startThread();
 
-	QVideoProbe *probe = new QVideoProbe;
-	connect(probe, SIGNAL(videoFrameProbed(QVideoFrame)), this, SLOT(mySlot(QVideoFrame)));
-	bool result = probe->setSource(player);
-	isFrameNecessary = 0;
-	qDebug() << result;
-	clipboard = QApplication::clipboard();
 }
 
 GamepadForm::~GamepadForm()
@@ -61,6 +55,7 @@ void GamepadForm::setUpGamepadForm()
 	setVideoController();
 	setLabels();
 	setUpControlButtonsHash();
+	setImageControl();
 	retranslate();
 }
 
@@ -90,12 +85,14 @@ void GamepadForm::setVideoController()
 
 void GamepadForm::handleMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
+	mTakeImageAction->setEnabled(false);
 	movie.setPaused(true);
 	switch (status) {
 	case QMediaPlayer::StalledMedia:
 	case QMediaPlayer::LoadedMedia:
 	case QMediaPlayer::BufferingMedia:
 		player->play();
+		mTakeImageAction->setEnabled(true);
 		mUi->loadingMediaLabel->setVisible(false);
 		mUi->invalidMediaLabel->setVisible(false);
 		mUi->label->setVisible(false);
@@ -211,153 +208,43 @@ void GamepadForm::setFontToPadButtons()
 	mUi->buttonPad2Left->setFont(font);
 	mUi->buttonPad2Right->setFont(font);
 }
-QImage GamepadForm::convertBits(const QVideoFrame &frame) {
 
-	//int resultBits[size];
-	qDebug() << frame.mappedBytes();
-	qDebug() << frame.size();
-	qDebug() << "planes count: " << frame.planeCount();
-	qDebug() << "bytes of 0 plane: " << frame.bytesPerLine(0);
-	qDebug() << "bytes of 1 plane: " << frame.bytesPerLine(1);
-	qDebug() << "bytes of 2 plane: " << frame.bytesPerLine(2);
-	qDebug() << "bytes of 3 plane: " << frame.bytesPerLine(3);
+void GamepadForm::saveImageToClipboard(QVideoFrame frame)
+{
+	if (isFrameNecessary) {
+		isFrameNecessary = false;
+		frame.map(QAbstractVideoBuffer::ReadOnly);
+		int width = frame.width();
+		int height = frame.height();
+		int size = height * width;
+		const uchar *data = frame.bits();
+		QImage img(width, height, QImage::Format_RGB32);
+		/// converting from yuv420 to rgb32
+		for (int i = 0; i < height; i++)
+			for (int j = 0; j < width; j++) {
+				int y = static_cast<int> (data[i * width + j]);
+				int u = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size]);
+				int v = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size + (size / 4)]);
 
-	/*
-	size.total = size.width * size.height;
-	y = yuv[position.y * size.width + position.x];
-	u = yuv[(position.y / 2) * (size.width / 2) + (position.x / 2) + size.total];
-	v = yuv[(position.y / 2) * (size.width / 2) + (position.x / 2) + size.total + (size.total / 4)];
-	*/
-	int width = frame.width();
-	int height = frame.height();
-	int size = height * width;
-	const uchar *data = frame.bits();
-	QImage img(width, height, QImage::Format_RGB32);
-	//img.fill(QColor(Qt::white).rgb());
-	for (int i = 0; i < height; i++)
-		for (int j = 0; j < width; j++) {
-			int y = static_cast<int> (data[i * width + j]);
-			int u = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size]);
-			int v = static_cast<int> (data[(i / 2) * (width / 2) + (j / 2) + size + (size / 4)]);
+				int r = y + int(1.13983 * (v - 128));
+				int g = y - int(0.39465 * (u - 128)) - int(0.58060 * (v - 128));
+				int b = y + int(2.03211 * (u - 128));
 
-			//float R = Y + 1.402 * (V - 128);
-			//float G = Y - 0.344 * (U - 128) - 0.714 * (V - 128);
-			//float B = Y + 1.772 * (U - 128);
+				r = r < 0 ? 0 : r > 255 ? 255 : r;
+				g = g < 0 ? 0 : g > 255 ? 255 : g;
+				b = b < 0 ? 0 : b > 255 ? 255 : b;
 
-			int r = y + int(1.13983 * (v - 128));
-			int g = y - int(0.39465 * (u - 128)) - int(0.58060 * (v - 128));
-			int b = y + int(2.03211 * (u - 128));
-			//int r = y + int(1.402 * (v - 128));
-			//int g = y - int(0.714 * (v - 128)) - int(0.344 * (u - 128));
-			//int b = y + int(1.772 * (u - 128));
-			if (r < 0)
-				r = 0;
-			if (g < 0)
-				g = 0;
-			if (b < 0)
-				b = 0;
-			if (r > 255)
-				r = 255;
-			if (g > 255)
-				g = 255;
-			if (b > 255)
-				b = 255;
-			//r = r < 0 ? 0 : r > 255 ? 255 : r;
-			//g = g < 0 ? 0 : g > 255 ? 255 : g;
-			//r = b < 0 ? 0 : b > 255 ? 255 : b;
+				img.setPixel(j, i, qRgb(r, g, b));
+			}
 
-			img.setPixel(j, i, qRgb(r, g, b));
-		}
-
-	clipboard->setImage(img);
-	if (img.save("img.png")) {
-		int f = 1;
+		clipboard->setImage(img);
+		frame.unmap();
 	}
-
-
-	/*
-	for (int i = 2; i < size; i += 2) {
-		int y = static_cast<int> (bits[i - 2]);
-		int u = static_cast<int> (bits[i - 1]);
-		int v = static_cast<int> (bits[i]);
-
-		int r = y + int(1.13983 * (v - 128));
-		int g = y - int(0.39465 * (u - 128)) - int(0.58060 * (v - 128));
-		int b = y + int(2.03211 * (u - 128));
-		resultBits[i - 2] = r;
-		resultBits[i - 1] = g;
-		resultBits[i] = b;
-	}
-	*/
-	return img;
 }
 
-
-void GamepadForm::mySlot(QVideoFrame buffer)
+void GamepadForm::requestImage()
 {
-	if (isFrameNecessary < 5) {
-
-		QImage img;
-		QVideoFrame frame(buffer);  // make a copy we can call map (non-const) on
-		frame.map(QAbstractVideoBuffer::ReadOnly);
-		qDebug() << "pixel format: " << frame.pixelFormat();
-		qDebug() << "size: " << frame.size();
-		qDebug() << "readable " << frame.isReadable();
-		qDebug() << "writeable " << frame.isWritable();
-		QImage img1 = convertBits(frame);
-		clipboard->setImage(img1);
-		//auto bits = frame.bits();
-		//QImage img1(bitsForRgb, frame.width(), frame.height(), frame.bytesPerLine(), QImage::Format_RGB32);
-		//clipboard->setImage(img1);
-		QString res = "";
-		//for (int i = 0; i < frame.width() * frame.height() + 10; i++)
-		//	res += bits[i];
-		qDebug() << res;
-		QImage::Format imageFormat = QVideoFrame::imageFormatFromPixelFormat(
-					frame.pixelFormat());
-		qDebug() << frame.mappedBytes();
-		qDebug() << frame.bytesPerLine();
-		// BUT the frame.pixelFormat() is QVideoFrame::Format_Jpeg, and this is
-		// mapped to QImage::Format_Invalid by
-		// QVideoFrame::imageFormatFromPixelFormat
-		if (imageFormat != QImage::Format_Invalid) {
-			img = QImage(frame.bits(),
-						 frame.width(),
-						 frame.height(),
-						 // frame.bytesPerLine(),
-						 imageFormat);
-		} else {
-			// e.g. JPEG
-			int nbytes = frame.mappedBytes();
-			img = QImage::fromData(frame.bits(), nbytes);
-		}
-		frame.unmap();
-
-		isFrameNecessary++;
-		/*
-		qDebug() << "validness: " << frame.isValid();
-		qDebug() << "frame geometry: " << frame.size();
-		qDebug() << "readable: " << frame.isReadable();
-		qDebug() << "writeable: " << frame.isWritable();
-		QImage::Format imageFormat =
-				QVideoFrame::imageFormatFromPixelFormat(frame.pixelFormat());
-
-		qDebug() << imageFormat;
-		QImage img(frame.bits(),
-				   frame.width(),
-				   frame.height(),
-				   frame.bytesPerLine(),
-				   imageFormat);
-		//mUi->connectedLabel->setPixmap(QPixmap::fromImage(img));
-		QLabel *label = new QLabel;
-		label->setMinimumWidth(480);
-		label->setMinimumHeight(640);
-		qDebug() << img.save("myImg.png");
-		label->setPixmap(QPixmap::fromImage(img));
-		label->show();
-		*/
-
-	}
+	isFrameNecessary = true;
 }
 
 void GamepadForm::setButtonChecked(const int &key, bool checkStatus)
@@ -433,7 +320,15 @@ void GamepadForm::createMenu()
 	mConnectionMenu = new QMenu(this);
 	mMenuBar->addMenu(mConnectionMenu);
 
-	mLanguageMenu=  new QMenu(this);
+	mImageMenu = new QMenu(this);
+	mMenuBar->addMenu(mImageMenu);
+	mTakeImageAction = new QAction(this);
+	mImageMenu->addAction(mTakeImageAction);
+	mTakeImageAction->setEnabled(false);
+	mTakeImageAction->setShortcut(QKeySequence("Ctrl+I"));
+	connect(mTakeImageAction, SIGNAL(triggered(bool)), this, SLOT(requestImage()));
+
+	mLanguageMenu =  new QMenu(this);
 	mMenuBar->addMenu(mLanguageMenu);
 
 	mConnectAction = new QAction(this);
@@ -531,6 +426,15 @@ void GamepadForm::setLabels()
 	QPixmap blueBall(":/images/blueBall.png");
 	mUi->connectingLabel->setPixmap(blueBall);
 	mUi->connectingLabel->setVisible(false);
+}
+
+void GamepadForm::setImageControl()
+{
+	probe = new QVideoProbe(this);
+	connect(probe, SIGNAL(videoFrameProbed(QVideoFrame)), this, SLOT(saveImageToClipboard(QVideoFrame)));
+	isFrameNecessary = false;
+	probe->setSource(player);
+	clipboard = QApplication::clipboard();
 }
 
 bool GamepadForm::eventFilter(QObject *obj, QEvent *event)
@@ -684,8 +588,10 @@ void GamepadForm::retranslate()
 {
 	mConnectionMenu->setTitle(tr("&Connection"));
 	mLanguageMenu->setTitle(tr("&Language"));
+	mImageMenu->setTitle(tr("&Image"));
 	mConnectAction->setText(tr("&Connect"));
 	mExitAction->setText(tr("&Exit"));
+	mTakeImageAction->setText(tr("&Screenshot to clipboard"));
 
 	mRussianLanguageAction->setText(tr("&Russian"));
 	mEnglishLanguageAction->setText(tr("&English"));
