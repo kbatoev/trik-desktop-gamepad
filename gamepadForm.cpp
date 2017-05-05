@@ -25,6 +25,8 @@
 #include <QMediaContent>
 #include <QFontDatabase>
 
+#include <QCommandLineParser>
+
 GamepadForm::GamepadForm()
 	: QWidget()
 	, mUi(new Ui::GamepadForm())
@@ -48,14 +50,24 @@ GamepadForm::~GamepadForm()
 
 void GamepadForm::startController(QStringList &args)
 {
-	connectionManager.setGamepadIp(args.at(1));
-	QString portStr = args.size() < 3 ? "4444" : args.at(2);
-	quint16 gamepadPort = static_cast<quint16>(portStr.toInt());
-	QString cameraPort = args.size() < 4 ? "8080" : args.at(3);
-	QString cameraIp = args.size() < 5 ? args.at(1) : args.at(4);
-	connectionManager.setCameraPort(cameraPort);
-	connectionManager.setGamepadPort(gamepadPort);
-	connectionManager.setCameraIp(cameraIp);
+	QCommandLineParser parser;
+	parser.setSingleDashWordOptionMode(QCommandLineParser::ParseAsLongOptions);
+	parser.addOptions({
+		{"gamepadIp", "IP of gamepad.", "gIp",}
+		, {"gamepadPort", "Port of gamepad.", "gPort"}
+		, {"cameraIp", "IP of camera.", "cameraIp", "cIp"}
+		, {"cameraPort", "Port of camera.", "cPort"}
+	});
+	parser.process(args);
+
+	if (parser.isSet("gamepadIp"))
+		connectionManager.setGamepadIp(parser.value("gamepadIp"));
+	if (parser.isSet("gamepadPort"))
+		connectionManager.setGamepadPort(parser.value("gamepadPort").toInt());
+	if (parser.isSet("cameraIp"))
+		connectionManager.setCameraIp(parser.value("cameraIp"));
+	if (parser.isSet("cameraPort"))
+		connectionManager.setCameraPort(parser.value("cameraPort"));
 	startVideoStream();
 	/// signal is used to execute connectionManager's method in its thread
 	connect(this, SIGNAL(dataReceivedFromCommandLine()), &connectionManager, SLOT(connectToHost()));
