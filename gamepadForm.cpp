@@ -34,7 +34,9 @@ GamepadForm::GamepadForm()
 	this->installEventFilter(this);
 	setUpGamepadForm();
 	startThread();
-
+	imageLabel = new QLabel(this);
+	imageLabel->setVisible(false);
+	mUi->verticalLayout->addWidget(imageLabel, Qt::AlignCenter);
 }
 
 GamepadForm::~GamepadForm()
@@ -65,7 +67,7 @@ void GamepadForm::setVideoController()
 	connect(player, SIGNAL(mediaStatusChanged(QMediaPlayer::MediaStatus)), this, SLOT(handleMediaStatusChanged(QMediaPlayer::MediaStatus)));
 
 	videoWidget = new QVideoWidget(this);
-	player->setVideoOutput(videoWidget);
+	//player->setVideoOutput(videoWidget);
 	videoWidget->setMinimumSize(320, 240);
 	videoWidget->setVisible(false);
 	mUi->verticalLayout->addWidget(videoWidget);
@@ -211,6 +213,9 @@ void GamepadForm::setFontToPadButtons()
 
 void GamepadForm::saveImageToClipboard(QVideoFrame frame)
 {
+	videoWidget->setVisible(false);
+	isFrameNecessary = true;
+	imageLabel->setVisible(true);
 	if (isFrameNecessary) {
 		isFrameNecessary = false;
 		frame.map(QAbstractVideoBuffer::ReadOnly);
@@ -236,10 +241,11 @@ void GamepadForm::saveImageToClipboard(QVideoFrame frame)
 
 				img.setPixel(j, i, qRgb(r, g, b));
 			}
-
+		imageLabel->setPixmap(QPixmap::fromImage(rotateImage(img)));
 		clipboard->setImage(img);
 		frame.unmap();
 	}
+
 }
 
 void GamepadForm::requestImage()
@@ -435,6 +441,23 @@ void GamepadForm::setImageControl()
 	isFrameNecessary = false;
 	probe->setSource(player);
 	clipboard = QApplication::clipboard();
+}
+
+QImage GamepadForm::rotateImage(QImage &img)
+{
+	int width = img.width();
+	int height = img.height();
+
+	int newImgWidth = height;
+	int newImgHeight = width;
+
+	//int height = img.height();
+	QImage img2(newImgWidth, newImgHeight, QImage::Format_RGB32);
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++) {
+			img2.setPixel(height - 1 - i, j, img.pixel(j, i));
+		}
+	return img2;
 }
 
 bool GamepadForm::eventFilter(QObject *obj, QEvent *event)
