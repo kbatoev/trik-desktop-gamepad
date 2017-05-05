@@ -241,7 +241,7 @@ void GamepadForm::saveImageToClipboard(QVideoFrame frame)
 
 				img.setPixel(j, i, qRgb(r, g, b));
 			}
-		imageLabel->setPixmap(QPixmap::fromImage(rotateImage(img)));
+		imageLabel->setPixmap(rotateImage(img));
 		clipboard->setImage(img);
 		frame.unmap();
 	}
@@ -443,21 +443,12 @@ void GamepadForm::setImageControl()
 	clipboard = QApplication::clipboard();
 }
 
-QImage GamepadForm::rotateImage(QImage &img)
+QPixmap GamepadForm::rotateImage(QImage &img)
 {
-	int width = img.width();
-	int height = img.height();
-
-	int newImgWidth = height;
-	int newImgHeight = width;
-
-	//int height = img.height();
-	QImage img2(newImgWidth, newImgHeight, QImage::Format_RGB32);
-	for (int i = 0; i < height; i++)
-		for (int j = 0; j < width; j++) {
-			img2.setPixel(height - 1 - i, j, img.pixel(j, i));
-		}
-	return img2;
+	QMatrix m;
+	m.rotate(90);
+	QPixmap pixmap = QPixmap::fromImage(img);
+	return pixmap.transformed(m);
 }
 
 bool GamepadForm::eventFilter(QObject *obj, QEvent *event)
