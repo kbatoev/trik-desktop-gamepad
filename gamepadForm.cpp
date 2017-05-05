@@ -46,7 +46,7 @@ GamepadForm::~GamepadForm()
 	thread.wait();
 }
 
-void GamepadForm::startController(QStringList args)
+void GamepadForm::startController(QStringList &args)
 {
 	connectionManager.setGamepadIp(args.at(1));
 	QString portStr = args.size() < 3 ? "4444" : args.at(2);

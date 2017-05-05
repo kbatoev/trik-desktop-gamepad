@@ -27,15 +27,14 @@ ConnectionManager::ConnectionManager()
 	/// passing this to QTcpSocket forces automatically socket->moveToThread()
 	/// when calling connectionManaget.moveToThread()
 	qRegisterMetaType<QAbstractSocket::SocketState>();
-	connect(socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)),
+	connect(socket.data(), SIGNAL(stateChanged(QAbstractSocket::SocketState)),
 			this, SIGNAL(stateChanged(QAbstractSocket::SocketState)));
 }
 
 ConnectionManager::~ConnectionManager()
 {
-	disconnect(socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)),
+	disconnect(socket.data(), SIGNAL(stateChanged(QAbstractSocket::SocketState)),
 			   this, SIGNAL(stateChanged(QAbstractSocket::SocketState)));
-	delete socket;
 }
 
 bool ConnectionManager::isConnected() const

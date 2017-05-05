@@ -20,6 +20,7 @@
 
 #include <QTcpSocket>
 #include <QIODevice>
+#include <QScopedPointer>
 
 
 class ConnectionManager : public QObject
@@ -61,7 +62,7 @@ signals:
 	void connectionFailed();
 
 private:
-	QTcpSocket *socket;
+	QScopedPointer<QTcpSocket> socket;
 	QString cameraIp;
 	QString cameraPort;
 

@@ -52,7 +52,7 @@ public:
 	/// Constructor.
 	GamepadForm();
 	~GamepadForm() override;
-	void startController(QStringList args);
+	void startController(QStringList &args);
 
 public slots:
 

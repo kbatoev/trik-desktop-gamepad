@@ -38,7 +38,7 @@ private:
 
 public:
 	/// Constructor.
-	ConnectForm(ConnectionManager *connectionManager
+	explicit ConnectForm(ConnectionManager *connectionManager
 				, QWidget *parent = 0);
 
 	/// Constructor that gets the previous entered values or default values
